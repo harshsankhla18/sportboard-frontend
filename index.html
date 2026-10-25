@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Sportboard – Live sports scores, real-time commentary, and match tracking powered by WebSockets." />
+  <title>Sportboard – Live Sports Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- AMBIENT BACKGROUND -->
+  <div class="bg-ambient" aria-hidden="true">
+    <div class="ambient-orb orb-1"></div>
+    <div class="ambient-orb orb-2"></div>
+    <div class="ambient-orb orb-3"></div>
+    <div class="grid-overlay"></div>
+  </div>
+
+  <!-- NOTIFICATION TOAST -->
+  <div id="toast-container" class="toast-container" role="status" aria-live="polite"></div>
+
+  <!-- HEADER / NAV -->
+  <header class="site-header" id="site-header">
+    <div class="header-inner">
+      <div class="logo" id="logo-home">
+        <div class="logo-icon">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="14" cy="14" r="13" stroke="#a31c1b" stroke-width="2"/>
+            <path d="M7 14 Q14 4 21 14 Q14 24 7 14Z" fill="#06110c"/>
+            <circle cx="14" cy="14" r="4" fill="#a31c1b"/>
+            <circle cx="14" cy="14" r="2" fill="white"/>
+          </svg>
+        </div>
+        <span class="logo-text">Sport<span class="logo-accent">board</span></span>
+      </div>
+
+      <nav class="main-nav" id="main-nav">
+        <button class="nav-btn active" id="nav-matches" data-view="matches">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M1 6h14M6 6v9" stroke="currentColor" stroke-width="1.5"/></svg>
+          Matches
+        </button>
+        <button class="nav-btn" id="nav-live" data-view="live">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3" fill="currentColor"/><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2"/></svg>
+          Live Now
+        </button>
+        <button class="nav-btn" id="nav-create" data-view="create">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1v14M1 8h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          New Match
+        </button>
+      </nav>
+
+      <!-- WS STATUS INDICATOR -->
+      <div class="ws-status" id="ws-status" title="WebSocket connection status">
+        <span class="ws-dot" id="ws-dot"></span>
+        <span class="ws-label" id="ws-label">Connecting...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content" id="main-content">
+
+    <!-- ===== MATCHES VIEW ===== -->
+    <section class="view active" id="view-matches">
+      <div class="section-hero">
+        <h1 class="section-title">
+          <span class="title-highlight">All Matches</span>
+        </h1>
+        <p class="section-subtitle">Browse upcoming, live, and finished matches. Click any match to view live commentary.</p>
+        <div class="filter-bar" id="filter-bar">
+          <button class="filter-pill active" data-sport="all">All Sports</button>
+          <button class="filter-pill" data-sport="football">Football</button>
+          <button class="filter-pill" data-sport="cricket">Cricket</button>
+          <button class="filter-pill" data-sport="basketball">Basketball</button>
+        </div>
+      </div>
+
+      <div class="matches-grid" id="matches-grid">
+        <div class="loading-state" id="matches-loading">
+          <div class="spinner"></div>
+          <p>Loading matches...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== LIVE VIEW ===== -->
+    <section class="view" id="view-live">
+      <div class="section-hero">
+        <h1 class="section-title">
+          <span class="live-badge-large">LIVE</span> Commentary
+        </h1>
+        <p class="section-subtitle">Real-time commentary powered by WebSockets. Subscribe to any live match.</p>
+      </div>
+
+      <div class="live-layout" id="live-layout">
+        <aside class="live-sidebar" id="live-sidebar">
+          <h2 class="sidebar-title">Active Matches</h2>
+          <div class="live-match-list" id="live-match-list">
+            <p class="empty-msg">No live matches right now.</p>
+          </div>
+        </aside>
+
+        <div class="commentary-panel" id="commentary-panel">
+          <div class="commentary-header" id="commentary-header">
+            <div class="commentary-match-info" id="commentary-match-info">
+              <p class="select-prompt">Select a match to start receiving live commentary</p>
+            </div>
+            <div class="commentary-controls">
+              <button class="ctrl-btn" id="btn-subscribe" disabled>Subscribe</button>
+              <button class="ctrl-btn secondary" id="btn-unsubscribe" disabled>Unsubscribe</button>
+              <button class="ctrl-btn ghost" id="btn-clear-feed">Clear Feed</button>
+            </div>
+          </div>
+
+          <div class="ws-debug-strip" id="ws-debug-strip">
+            <span class="ws-debug-label">WebSocket</span>
+            <span class="ws-debug-status" id="ws-debug-status">-</span>
+            <span class="ws-debug-label">Pub/Sub</span>
+            <span class="ws-debug-sub" id="ws-debug-sub">not subscribed</span>
+            <span class="ws-debug-label">Ping/Pong</span>
+            <span class="ws-debug-ping" id="ws-debug-ping">-</span>
+          </div>
+
+          <div class="commentary-feed" id="commentary-feed">
+            <div class="feed-empty" id="feed-empty">
+              <svg width="64" height="64" viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="30" stroke="#a31c1b" stroke-width="1.5" stroke-dasharray="4 4"/><path d="M20 32 Q32 16 44 32 Q32 48 20 32Z" fill="none" stroke="#06110c" stroke-width="1.5"/><circle cx="32" cy="32" r="4" fill="#a31c1b" opacity="0.5"/></svg>
+              <p>No commentary yet. Subscribe to a live match above.</p>
+            </div>
+          </div>
+
+          <div class="add-commentary-bar" id="add-commentary-bar">
+            <h3 class="form-title">Post Commentary</h3>
+            <form class="commentary-form" id="commentary-form">
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="cf-minute">Minute</label>
+                  <input type="number" id="cf-minute" min="0" max="200" placeholder="0" required />
+                </div>
+                <div class="form-group">
+                  <label for="cf-sequence">Sequence</label>
+                  <input type="number" id="cf-sequence" min="0" placeholder="1" required />
+                </div>
+                <div class="form-group">
+                  <label for="cf-period">Period</label>
+                  <select id="cf-period" required>
+                    <option value="1st half">1st Half</option>
+                    <option value="2nd half">2nd Half</option>
+                    <option value="extra time">Extra Time</option>
+                    <option value="penalties">Penalties</option>
+                    <option value="1st quarter">1st Quarter</option>
+                    <option value="2nd quarter">2nd Quarter</option>
+                    <option value="3rd quarter">3rd Quarter</option>
+                    <option value="4th quarter">4th Quarter</option>
+                    <option value="1st innings">1st Innings</option>
+                    <option value="2nd innings">2nd Innings</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="cf-event-type">Event</label>
+                  <select id="cf-event-type" required>
+                    <option value="kickoff">Kickoff</option>
+                    <option value="goal">Goal</option>
+                    <option value="shot">Shot</option>
+                    <option value="save">Save</option>
+                    <option value="foul">Foul</option>
+                    <option value="yellow_card">Yellow Card</option>
+                    <option value="red_card">Red Card</option>
+                    <option value="substitution">Substitution</option>
+                    <option value="pass">Pass</option>
+                    <option value="wicket">Wicket</option>
+                    <option value="boundary">Boundary</option>
+                    <option value="six">Six</option>
+                    <option value="timeout">Timeout</option>
+                    <option value="three_pointer">3-Pointer</option>
+                    <option value="halftime">Half Time</option>
+                    <option value="fulltime">Full Time</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group flex-2">
+                  <label for="cf-message">Message</label>
+                  <input type="text" id="cf-message" placeholder="Describe the moment..." required />
+                </div>
+                <div class="form-group">
+                  <label for="cf-actor">Actor (optional)</label>
+                  <input type="text" id="cf-actor" placeholder="Player name" />
+                </div>
+                <div class="form-group">
+                  <label for="cf-team">Team (optional)</label>
+                  <input type="text" id="cf-team" placeholder="Team name" />
+                </div>
+              </div>
+              <button type="submit" class="submit-btn" id="btn-post-commentary" disabled>
+                Broadcast Commentary
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== CREATE MATCH VIEW ===== -->
+    <section class="view" id="view-create">
+      <div class="section-hero">
+        <h1 class="section-title">Create <span class="title-highlight">New Match</span></h1>
+        <p class="section-subtitle">Set up a new match. Once created, it will be broadcast to all connected clients via WebSocket.</p>
+      </div>
+
+      <div class="create-layout">
+        <div class="create-form-card">
+          <form class="create-form" id="create-match-form">
+            <div class="form-section-label">Match Details</div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="cm-sport">Sport</label>
+                <select id="cm-sport" required>
+                  <option value="">Select sport...</option>
+                  <option value="football">Football</option>
+                  <option value="cricket">Cricket</option>
+                  <option value="basketball">Basketball</option>
+                  <option value="tennis">Tennis</option>
+                  <option value="rugby">Rugby</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row teams-row">
+              <div class="form-group">
+                <label for="cm-home">Home Team</label>
+                <input type="text" id="cm-home" placeholder="Home team name" required />
+              </div>
+              <div class="vs-divider">VS</div>
+              <div class="form-group">
+                <label for="cm-away">Away Team</label>
+                <input type="text" id="cm-away" placeholder="Away team name" required />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="cm-home-score">Home Score</label>
+                <input type="number" id="cm-home-score" value="0" min="0" />
+              </div>
+              <div class="form-group">
+                <label for="cm-away-score">Away Score</label>
+                <input type="number" id="cm-away-score" value="0" min="0" />
+              </div>
+            </div>
+
+            <div class="form-section-label">Schedule</div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="cm-start">Start Time</label>
+                <input type="datetime-local" id="cm-start" required />
+              </div>
+              <div class="form-group">
+                <label for="cm-end">End Time</label>
+                <input type="datetime-local" id="cm-end" required />
+              </div>
+            </div>
+
+            <div class="create-form-actions">
+              <button type="submit" class="submit-btn" id="btn-create-match">
+                Create Match
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="create-side">
+          <div class="create-side-header">
+            <h2>Recent Broadcasts</h2>
+            <p>New matches broadcast via WebSocket in real-time</p>
+          </div>
+          <div class="broadcast-feed" id="broadcast-feed">
+            <p class="empty-msg">No broadcasts yet this session.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MATCH DETAIL MODAL -->
+  <div class="modal-backdrop" id="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-card" id="modal-card">
+      <button class="modal-close" id="modal-close" aria-label="Close modal">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 3l14 14M17 3L3 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+
+      <div class="modal-header" id="modal-header">
+        <span class="modal-sport-badge" id="modal-sport-badge"></span>
+        <div class="modal-match-title" id="modal-match-title"></div>
+        <div class="modal-status" id="modal-status"></div>
+      </div>
+
+      <div class="modal-scoreboard" id="modal-scoreboard">
+        <div class="score-team" id="score-home">
+          <div class="team-name" id="modal-home-name"></div>
+          <div class="team-score home-score" id="modal-home-score"></div>
+        </div>
+        <div class="score-separator">:</div>
+        <div class="score-team" id="score-away">
+          <div class="team-name" id="modal-away-name"></div>
+          <div class="team-score away-score" id="modal-away-score"></div>
+        </div>
+      </div>
+
+      <div class="modal-body" id="modal-body">
+        <div class="modal-tabs">
+          <button class="modal-tab active" id="tab-commentary" data-tab="commentary">Commentary</button>
+          <button class="modal-tab" id="tab-details" data-tab="details">Match Details</button>
+        </div>
+
+        <div class="modal-tab-content" id="modal-commentary-tab">
+          <div class="modal-commentary-feed" id="modal-commentary-feed">
+            <div class="spinner"></div>
+          </div>
+        </div>
+
+        <div class="modal-tab-content hidden" id="modal-details-tab">
+          <div class="details-grid" id="modal-details-grid"></div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="ctrl-btn" id="btn-watch-live">
+          Watch Live
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
